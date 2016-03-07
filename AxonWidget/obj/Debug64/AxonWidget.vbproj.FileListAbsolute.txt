@@ -1,0 +1,12 @@
+C:\Users\Dani\AppData\Local\Temporary Projects\AxonWidget\obj\Debug64\AxonWidget.vbprojResolveAssemblyReference.cache
+C:\Users\Dani\AppData\Local\Temporary Projects\AxonWidget\obj\Debug64\AxonWidget.Resources.resources
+C:\Users\Dani\AppData\Local\Temporary Projects\AxonWidget\obj\Debug64\AxonWidget.vbproj.GenerateResource.Cache
+X:\Grasshopper\Míos\Code\AxonWidget\AxonWidget\AxonWidget\bin\AxonWidget.dll
+X:\Grasshopper\Míos\Code\AxonWidget\AxonWidget\AxonWidget\bin\AxonWidget.pdb
+X:\Grasshopper\Míos\Code\AxonWidget\AxonWidget\AxonWidget\bin\AxonWidget.xml
+X:\Grasshopper\Míos\Code\AxonWidget\AxonWidget\AxonWidget\obj\Debug64\AxonWidget.vbprojResolveAssemblyReference.cache
+X:\Grasshopper\Míos\Code\AxonWidget\AxonWidget\AxonWidget\obj\Debug64\AxonWidget.Resources.resources
+X:\Grasshopper\Míos\Code\AxonWidget\AxonWidget\AxonWidget\obj\Debug64\AxonWidget.vbproj.GenerateResource.Cache
+X:\Grasshopper\Míos\Code\AxonWidget\AxonWidget\AxonWidget\obj\Debug64\AxonWidget.dll
+X:\Grasshopper\Míos\Code\AxonWidget\AxonWidget\AxonWidget\obj\Debug64\AxonWidget.xml
+X:\Grasshopper\Míos\Code\AxonWidget\AxonWidget\AxonWidget\obj\Debug64\AxonWidget.pdb
