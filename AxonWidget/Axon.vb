@@ -213,12 +213,13 @@ Public Class Axon
 
     Private Sub DocumentChanged(sender As GH_Canvas, e As GH_CanvasDocumentChangedEventArgs) Handles WECanvas.DocumentChanged
         If Enabled AndAlso e.NewDocument IsNot Nothing Then
-            XML = New AxonXML(e.NewDocument)
+            XML = New AxonXML(Me, e.NewDocument)
             If Not sorted Then
                 XML.XSortComponentsByFrecuency(True)
                 sorted = True
             End If
         End If
+
     End Sub
 #End Region
 
@@ -304,12 +305,6 @@ Public Class Axon
             Me.Owner.Invalidate()
         End Set
     End Property
-
-    'Public ReadOnly Property ConnectivityDatabase As AxonConnectivityDatabase
-    ' Get
-    'Return _ConnectivityDatabase
-    'End Get
-    ' End Property
 
     Public ReadOnly Property AxonXML As AxonXML
         Get
@@ -484,7 +479,9 @@ Public Class Axon
                     pt.Y += Math.Cos(ang) * radius2
 
                     Dim rec As New Rectangle(pt.X - sizeIcon2 * 0.5F, pt.Y - sizeIcon2 * 0.5F, sizeIcon2, sizeIcon2)
-                    Elements.Add(New AxonElement(tab.Name, New Bitmap(server.GetCategoryIcon(tab.Name), New Size(sizeIcon2, sizeIcon2)), rec, tab))
+                    Dim img As Bitmap = server.GetCategoryIcon(tab.Name)
+                    If img IsNot Nothing Then img = New Bitmap(img, New Size(sizeIcon2, sizeIcon2))
+                    Elements.Add(New AxonElement(tab.Name, img, rec, tab))
 
                     ang += (2 * Math.PI) / Math.Floor((radius2 * 2 * Math.PI / Math.Sqrt(sizeIcon2 ^ 2 * 2)))
                     paso += 1
@@ -542,7 +539,9 @@ Public Class Axon
                         paso += 1
 
                         Dim proxy As IGH_ObjectProxy = Instances.ComponentServer.EmitObjectProxy(panel.Items(i).Id)
-                        Elements.Add(New AxonElement(proxy.Desc.Name, New Bitmap(proxy.Icon, New Size(SizeIcon, SizeIcon)), rec, proxy))
+                        Dim img As Bitmap = proxy.Icon
+                        If img IsNot Nothing Then img = New Bitmap(proxy.Icon, New Size(SizeIcon, SizeIcon))
+                        Elements.Add(New AxonElement(proxy.Desc.Name, img, rec, proxy))
 
                     Next
                     If Radius2 > Boundary Then Boundary = Radius2 + SizeIcon * 1.5
@@ -1040,7 +1039,7 @@ Public Class Axon
                 selrec.Height -= 1
                 Grasshopper.GUI.GH_GraphicsUtil.RenderHighlightBox(G, selrec, 2)
             End If
-            Grasshopper.GUI.GH_GraphicsUtil.RenderCenteredIcon(G, rec, Elements(i).Icon)
+            If Elements(i).Icon IsNot Nothing Then Grasshopper.GUI.GH_GraphicsUtil.RenderCenteredIcon(G, rec, Elements(i).Icon)
         Next
     End Sub
 #End Region
@@ -1183,15 +1182,17 @@ End Enum
 
 Public Class AxonXML
 
+    Private A As Axon
     Private WithEvents ghDoc As GH_Document
     Private XDoc As System.Xml.Linq.XDocument
     Private Server As Grasshopper.Kernel.GH_ComponentServer
     Private _File As String
     Private OnUse As Boolean
-    Private AddedCounter As New Integer
 
-    Sub New(Doc As GH_Document)
+    Sub New(Axon As Axon, Doc As GH_Document)
+
         If Doc Is Nothing Then Exit Sub
+        A = Axon
         ghDoc = Doc
         Server = Instances.ComponentServer
         _File = My.Application.Info.DirectoryPath & "\AxonConnectivityDatabase.xml"
@@ -1313,6 +1314,7 @@ Public Class AxonXML
 #Region "Events"
     Private Sub Create()
 
+        AddHandler ghDoc.ContextChanged, AddressOf ContextChanged
         AddHandler ghDoc.ObjectsAdded, AddressOf AddedObjects
 
         For Each obj As IGH_DocumentObject In ghDoc.Objects
@@ -1330,6 +1332,7 @@ Public Class AxonXML
 
     Public Sub Destroy()
 
+        RemoveHandler ghDoc.ContextChanged, AddressOf ContextChanged
         RemoveHandler ghDoc.ObjectsAdded, AddressOf AddedObjects
 
         For Each obj As IGH_DocumentObject In ghDoc.Objects
@@ -1346,39 +1349,32 @@ Public Class AxonXML
 
     Private Sub AddedObjects(sender As Object, e As Kernel.GH_DocObjectEventArgs)
         Try
+            If A.Visible Then
+                For Each obj As IGH_DocumentObject In e.Objects
+                    If obj Is Nothing Then Continue For
 
-            For Each obj As IGH_DocumentObject In e.Objects
-                If obj Is Nothing Then Continue For
+                    If TypeOf obj Is IGH_Param Then
+                        AddHandler obj.ObjectChanged, AddressOf WireEvent
 
-                If TypeOf obj Is IGH_Param Then
-                    AddHandler obj.ObjectChanged, AddressOf WireEvent
+                    ElseIf TypeOf obj Is IGH_Component Then
+                        Dim Comp As IGH_Component = DirectCast(obj, IGH_Component)
+                        For Each p As IGH_Param In Comp.Params
+                            AddHandler p.ObjectChanged, AddressOf WireEvent
+                        Next
+                    Else
+                        Exit Sub
+                    End If
 
-                ElseIf TypeOf obj Is IGH_Component Then
-                    Dim Comp As IGH_Component = DirectCast(obj, IGH_Component)
-                    For Each p As IGH_Param In Comp.Params
-                        AddHandler p.ObjectChanged, AddressOf WireEvent
-                    Next
-                Else
-                    Exit Sub
-                End If
-
-                Dim proxy As IGH_ObjectProxy = GetObjectProxy(obj.Name)
-                If proxy Is Nothing Then Continue For
-                Dim C As XElement = XGetComponent(proxy.Guid)
-                If C Is Nothing Then
-                    AddNewComponent(proxy.Guid)
-                Else
-                    C.Attribute("frequency").Value = CInt(C.Attribute("frequency").Value) + 1
-                End If
-
-                AddedCounter += 1
-                If AddedCounter >= 30 Then
-                    XSortComponentsByFrecuency(True)
-                    AddedCounter = 0
-                End If
-            Next
-            Save()
-
+                    Dim proxy As IGH_ObjectProxy = GetObjectProxy(obj.Name)
+                    If proxy Is Nothing Then Continue For
+                    Dim C As XElement = XGetComponent(proxy.Guid)
+                    If C Is Nothing Then
+                        AddNewComponent(proxy.Guid)
+                    Else
+                        C.Attribute("frequency").Value = CInt(C.Attribute("frequency").Value) + 1
+                    End If
+                Next
+            End If
         Catch ex As Exception
             Rhino.RhinoApp.WriteLine(ex.ToString)
         End Try
@@ -1386,51 +1382,60 @@ Public Class AxonXML
 
     Private Sub WireEvent(sender As IGH_DocumentObject, e As GH_ObjectChangedEventArgs)
         Try
-            If e.Type = GH_ObjectEventType.Sources Then
-                If TypeOf sender Is IGH_Param Then
-                    Dim targetParam As IGH_Param = DirectCast(sender, IGH_Param)
-                    If targetParam.SourceCount < 1 Then Exit Sub
-                    Dim sourceParam As IGH_Param = targetParam.Sources.Last()
-                    Dim source As IGH_DocumentObject = sourceParam.Attributes.GetTopLevel.DocObject
-                    Dim target As IGH_DocumentObject = targetParam.Attributes.GetTopLevel.DocObject
-                    Dim proxysource As IGH_ObjectProxy = GetObjectProxy(source.Name)
-                    If proxysource Is Nothing Then Exit Sub
-                    Dim proxytarget As IGH_ObjectProxy = GetObjectProxy(target.Name)
-                    If proxytarget Is Nothing Then Exit Sub
-                    Dim iOutput As Integer = Nothing
-                    Dim iInput As Integer = Nothing
+            If A.Visible Then
+                If e.Type = GH_ObjectEventType.Sources Then
+                    If TypeOf sender Is IGH_Param Then
+                        Dim targetParam As IGH_Param = DirectCast(sender, IGH_Param)
+                        If targetParam.SourceCount < 1 Then Exit Sub
+                        Dim sourceParam As IGH_Param = targetParam.Sources.Last()
+                        Dim source As IGH_DocumentObject = sourceParam.Attributes.GetTopLevel.DocObject
+                        Dim target As IGH_DocumentObject = targetParam.Attributes.GetTopLevel.DocObject
+                        Dim proxysource As IGH_ObjectProxy = GetObjectProxy(source.Name)
+                        If proxysource Is Nothing Then Exit Sub
+                        Dim proxytarget As IGH_ObjectProxy = GetObjectProxy(target.Name)
+                        If proxytarget Is Nothing Then Exit Sub
+                        Dim iOutput As Integer = Nothing
+                        Dim iInput As Integer = Nothing
 
-                    If TypeOf source Is IGH_Component Then
-                        Dim sComp As IGH_Component = DirectCast(source, IGH_Component)
-                        For i As Int32 = 0 To sComp.Params.Output.Count - 1
-                            If sComp.Params.Output(i).Name.Equals(sourceParam.Name) Then
-                                iOutput = i
-                                Exit For
-                            End If
-                        Next
-                    ElseIf TypeOf source Is IGH_Param Then
-                        iOutput = 0
+                        If TypeOf source Is IGH_Component Then
+                            Dim sComp As IGH_Component = DirectCast(source, IGH_Component)
+                            For i As Int32 = 0 To sComp.Params.Output.Count - 1
+                                If sComp.Params.Output(i).Name.Equals(sourceParam.Name) Then
+                                    iOutput = i
+                                    Exit For
+                                End If
+                            Next
+                        ElseIf TypeOf source Is IGH_Param Then
+                            iOutput = 0
+                        End If
+
+                        If TypeOf target Is IGH_Component Then
+                            Dim tComp As IGH_Component = DirectCast(target, IGH_Component)
+                            For i As Int32 = 0 To tComp.Params.Input.Count - 1
+                                If tComp.Params.Input(i).Name.Equals(targetParam.Name) Then
+                                    iInput = i
+                                    Exit For
+                                End If
+                            Next
+                        ElseIf TypeOf target Is IGH_Param Then
+                            iInput = 0
+                        End If
+
+                        SerializeConnection(proxysource.Guid, iOutput, iInput, proxytarget.Guid)
                     End If
-
-                    If TypeOf target Is IGH_Component Then
-                        Dim tComp As IGH_Component = DirectCast(target, IGH_Component)
-                        For i As Int32 = 0 To tComp.Params.Input.Count - 1
-                            If tComp.Params.Input(i).Name.Equals(targetParam.Name) Then
-                                iInput = i
-                                Exit For
-                            End If
-                        Next
-                    ElseIf TypeOf target Is IGH_Param Then
-                        iInput = 0
-                    End If
-
-                    SerializeConnection(proxysource.Guid, iOutput, iInput, proxytarget.Guid)
                 End If
-
             End If
         Catch ex As Exception
             Rhino.RhinoApp.WriteLine(ex.ToString)
         End Try
+    End Sub
+
+    Private Sub ContextChanged(sender As Object, e As GH_DocContextEventArgs)
+        If e.Context = GH_DocumentContext.Loaded Then
+            XSortComponentsByFrecuency(True)
+        ElseIf e.Context = GH_DocumentContext.Close Then
+            Save()
+        End If
     End Sub
 #End Region
 
@@ -1471,7 +1476,6 @@ Public Class AxonXML
                     End If
                 End If
             End If
-            Save()
 
         Catch ex As Exception
             Rhino.RhinoApp.WriteLine(vbCrLf & "AxonXML.SerializeConnection() exception at " & Date.Now() & vbCrLf & ex.ToString)
@@ -1658,7 +1662,13 @@ Public Class AxonXML
     End Sub
 
     Public Sub Save()
-        XDoc.Save(_File)
+        If XDoc IsNot Nothing AndAlso _File IsNot Nothing Then
+            Try
+                XDoc.Save(_File)
+            Catch ex As Exception
+                Rhino.RhinoApp.WriteLine("AxonXML could not be saved.")
+            End Try
+        End If
     End Sub
 
     Public Sub ResetRoot()
