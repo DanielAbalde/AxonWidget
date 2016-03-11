@@ -1192,11 +1192,11 @@ Public Class AxonXML
     Sub New(Axon As Axon, Doc As GH_Document)
 
         If Doc Is Nothing Then Exit Sub
+
         A = Axon
         ghDoc = Doc
         Server = Instances.ComponentServer
-        _File = My.Application.Info.DirectoryPath & "\AxonConnectivityDatabase.xml"
-
+        _File = Grasshopper.Folders.DefaultAssemblyFolder & "AxonConnectivityDatabase.xml"
         Try
             If Not IO.File.Exists(_File) Then
                 Dim ofd As New System.Windows.Forms.OpenFileDialog()
