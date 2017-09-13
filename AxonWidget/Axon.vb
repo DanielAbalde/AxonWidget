@@ -7,6 +7,7 @@ Imports Grasshopper
 Imports Grasshopper.Kernel
 Imports Grasshopper.GUI
 Imports Grasshopper.GUI.Canvas
+Imports System.IO
 
 Public Class SetupWidget
     Inherits Grasshopper.Kernel.GH_AssemblyPriority
@@ -69,6 +70,7 @@ Public Class Axon
         ParamOfWire = Nothing
         CenterControl = Nothing
         _IsActive = False
+
     End Sub
 
 #Region "Mouse"
@@ -434,6 +436,8 @@ Public Class Axon
 #End Region
 
 #Region "Sub"
+
+
     Private Sub SetElements()
         Boundary = Radius * 1.5
         Select Case Mode
@@ -454,6 +458,7 @@ Public Class Axon
             Case 0
 
                 Dim server As GH_ComponentServer = Instances.ComponentServer
+
                 Elements.Clear()
                 TabSaved = Nothing
 
@@ -582,7 +587,7 @@ Public Class Axon
                 End If
 
             Else
-                    connections = XML.GetTopComponents(_Max)
+                connections = XML.GetTopComponents(_Max)
             End If
 
             If connections.Count = 0 Then Exit Sub
@@ -802,8 +807,6 @@ Public Class Axon
             comp.NewInstanceGuid()
             If comp.Attributes Is Nothing Then comp.CreateAttributes()
             comp.Attributes.Pivot = Owner.Viewport.UnprojectPoint(CenterControl)
-            '  comp.Attributes.ExpireLayout()
-            ' comp.Attributes.PerformLayout()
             Owner.Document.AutoSave(GH_AutoSaveTrigger.object_added)
             Owner.Document.UndoUtil.RecordAddObjectEvent("Add " + comp.Name, comp)
             Owner.Document.AddObject(comp, False, Owner.Document.ObjectCount)
@@ -833,11 +836,9 @@ Public Class Axon
             If obj.Attributes Is Nothing Then obj.CreateAttributes()
             Dim Pivot As Drawing.PointF = Owner.Viewport.UnprojectPoint(CenterControl)
             obj.Attributes.Pivot = Pivot
-            ' obj.Attributes.ExpireLayout()
             Owner.Document.AutoSave(GH_AutoSaveTrigger.object_added)
             Owner.Document.UndoUtil.RecordAddObjectEvent("Add " + obj.Name, obj)
             Owner.Document.AddObject(obj, False, Owner.Document.ObjectCount)
-            '    Owner.Refresh()
 
             'AddSource.
             Dim IsInput As Boolean = IsInputParameter(Param)
@@ -883,13 +884,15 @@ Public Class Axon
 
                     Owner.Document.UndoUtil.RecordWireEvent("New wire", input)
                     input.AddSource(output)
-
+                    Dim tpobj As IGH_DocumentObject = output.Attributes.GetTopLevel.DocObject
+                    tpobj.ExpireSolution(True)
                 Else
                     Rhino.RhinoApp.WriteLine("Ni comp ni param, " & obj.GetType().ToString)
                 End If
             End If
             ' Owner.Refresh()
-            Owner.Document.NewSolution(True)
+            'Owner.Document.NewSolution(True)
+            obj.ExpireSolution(True)
 
         Catch ex As Exception
             Rhino.RhinoApp.WriteLine(ex.ToString)
@@ -1079,7 +1082,7 @@ Public Class Axon
         GH_DocumentObject.Menu_AppendItem(menu, "By category", New EventHandler(AddressOf Menu_ByCategory), True, _Mode = AxonMode.ByCategory)
         GH_DocumentObject.Menu_AppendItem(menu, "By frequency", New EventHandler(AddressOf Menu_ByFrequency), True, _Mode = AxonMode.ByFrequency)
         GH_DocumentObject.Menu_AppendItem(menu, "By parameter", New EventHandler(AddressOf Menu_ByParameter), True, _Mode = AxonMode.ByParameter)
-        GH_DocumentObject.Menu_AppendItem(menu, "By random", New EventHandler(AddressOf menu_ByRandom), True, _Mode = AxonMode.ByRandom)
+        GH_DocumentObject.Menu_AppendItem(menu, "By random", New EventHandler(AddressOf Menu_ByRandom), True, _Mode = AxonMode.ByRandom)
         GH_DocumentObject.Menu_AppendSeparator(menu)
         GH_DocumentObject.Menu_AppendItem(menu, "Attributes", New EventHandler(AddressOf Menu_Attributes))
     End Sub
@@ -1178,6 +1181,7 @@ Public Enum AxonMode
     ByFrequency = 2
     ByParameter = 3
     ByRandom = 4
+    ByBrickBox = 5
 End Enum
 
 Public Class AxonXML
@@ -1906,7 +1910,7 @@ Public Class AxonXML
                 Next
                 Return Nothing
             End If
-        ElseIf TypeOf Component Is IGH_Param
+        ElseIf TypeOf Component Is IGH_Param Then
             Return 0
         Else
             Return Nothing

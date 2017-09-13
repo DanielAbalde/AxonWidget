@@ -3,6 +3,11 @@
 Public Class AxonWidgetInfo
     Inherits GH_AssemblyInfo
 
+    Public Overrides ReadOnly Property AssemblyVersion As String
+        Get
+            Return "0.2.2"
+        End Get
+    End Property
     Public Overrides ReadOnly Property Name() As String
         Get
             Return "AxonWidget"
